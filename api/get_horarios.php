@@ -22,7 +22,7 @@ if (empty($medico_id) || empty($fecha)) {
 try {
     $db = getDB();
     
-    // Obtener día de la semana en español
+// Obtener día de la semana en español
     $dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     $dia_semana = $dias[date('w', strtotime($fecha))];
     
