@@ -1,4 +1,4 @@
-name: CI Clinica
+name: CI Clinica 
 
 on:
   push:
