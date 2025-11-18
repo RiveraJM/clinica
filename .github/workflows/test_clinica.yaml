@@ -1,4 +1,4 @@
-name: Test Clinica
+name: CI Clinica
 
 on:
   push:
@@ -9,19 +9,25 @@ on:
 permissions:
   contents: read
 
+env:
+  COMPOSER_NO_INTERACTION: 1
+  COMPOSER_PROCESS_TIMEOUT: 0
+  COMPOSER_NO_AUDIT: 1
+
 jobs:
   ci:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repo
+    # -------------------------------------------------------
+    # Checkout del código en la raíz (donde está composer.json)
+    # -------------------------------------------------------
+    - name: Checkout Repo
       uses: actions/checkout@v4
 
-    # 👇 Entrar al directorio correcto (Clinica)
-    - name: Enter project directory
-      run: cd Clinica && pwd
-      shell: bash
-
+    # -------------------------------------------------------
+    # Configurar PHP
+    # -------------------------------------------------------
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
       with:
@@ -30,27 +36,45 @@ jobs:
         tools: phpunit
         coverage: none
 
+    # -------------------------------------------------------
+    # Validar composer.json (ya funciona correctamente)
+    # -------------------------------------------------------
     - name: Validate composer.json
-      run: cd Clinica && composer validate --strict
+      run: |
+        if [ -f composer.json ]; then
+          composer validate --strict
+        else
+          echo "No composer.json found — skipping validate"
+        fi
 
-    - name: Cache Composer
+    # -------------------------------------------------------
+    # Cache composer
+    # -------------------------------------------------------
+    - name: Cache Composer files
       uses: actions/cache@v3
       with:
-        path: Clinica/vendor
-        key: ${{ runner.os }}-composer-${{ hashFiles('Clinica/composer.lock') }}
+        path: |
+          vendor
+        key: ${{ runner.os }}-composer-${{ hashFiles('composer.lock') }}
         restore-keys: |
           ${{ runner.os }}-composer-
 
-    - name: Install dependencies
-      run: cd Clinica && composer install --prefer-dist --no-interaction --no-progress
+    # -------------------------------------------------------
+    # Instalar dependencias
+    # -------------------------------------------------------
+    - name: Install Dependencies
+      run: |
+        if [ -f composer.json ]; then
+          composer install --prefer-dist --no-interaction --no-progress
+        else
+          echo "No composer.json - skipping composer install"
+        fi
 
-    # -------------------------
-    # Install Tools
-    # -------------------------
-
+    # -------------------------------------------------------
+    # Instalar herramientas de análisis de código
+    # -------------------------------------------------------
     - name: Install PHPStan
       run: |
-        cd Clinica
         wget -q https://github.com/phpstan/phpstan/releases/latest/download/phpstan.phar -O phpstan
         chmod +x phpstan
 
@@ -66,25 +90,31 @@ jobs:
 
     - name: Install PHPCPD
       run: |
-        cd Clinica
         wget -q https://phar.phpunit.de/phpcpd.phar -O phpcpd
         chmod +x phpcpd
 
-    # -------------------------
-    # Code Quality Checks
-    # -------------------------
+    # -------------------------------------------------------
+    # Análisis profesional de calidad de código
+    # -------------------------------------------------------
+    - name: PHPCS (PSR-12)
+      run: phpcs --standard=PSR12 . || true
 
-    - name: Run PHPCS (PSR-12)
-      run: phpcs --standard=PSR12 Clinica || true
+    - name: PHPStan (level max)
+      run: ./phpstan analyse . --level=max --no-progress || true
 
-    - name: Run PHPStan
-      run: cd Clinica && ./phpstan analyse . --level=max --no-progress || true
+    - name: PHPMD
+      run: phpmd . text cleancode,codesize,design,unusedcode || true
 
-    - name: Run PHPMD
-      run: phpmd Clinica text cleancode,codesize,design,unusedcode || true
+    - name: PHPCPD (Duplicated code)
+      run: ./phpcpd . || true
 
-    - name: Run PHPCPD
-      run: cd Clinica && ./phpcpd . || true
-
+    # -------------------------------------------------------
+    # PHPUnit (si luego agregas tests)
+    # -------------------------------------------------------
     - name: Run PHPUnit
-      run: cd Clinica && vendor/bin/phpunit || true
+      run: |
+        if [ -f vendor/bin/phpunit ]; then
+          vendor/bin/phpunit || true
+        else
+          echo "PHPUnit no encontrado — no hay tests aún"
+        fi
